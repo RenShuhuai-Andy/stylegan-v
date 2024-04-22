@@ -264,6 +264,7 @@ class VideoFramesFolderDataset(Dataset):
         resolution=None,                                # Unused arg for backward compatibility
         load_n_consecutive: int=None,                   # Should we load first N frames for each video?
         load_n_consecutive_random_offset: bool=True,    # Should we use a random offset when loading consecutive frames?
+        load_n_consecutive_offset: int=0,               # Offset when loading consecutive frames
         subsample_factor: int=1,                        # Sampling factor, i.e. decreasing the temporal resolution
         discard_short_videos: bool=False,               # Should we discard videos that are shorter than `load_n_consecutive`?
         **super_kwargs,                                 # Additional arguments for the Dataset base class.
@@ -274,6 +275,7 @@ class VideoFramesFolderDataset(Dataset):
         self._zipfile = None
         self.load_n_consecutive = load_n_consecutive
         self.load_n_consecutive_random_offset = load_n_consecutive_random_offset
+        self.load_n_consecutive_offset = load_n_consecutive_offset
         self.subsample_factor = subsample_factor
         self.discard_short_videos = discard_short_videos
 
@@ -316,9 +318,13 @@ class VideoFramesFolderDataset(Dataset):
                 # We encountered a new directory
                 assert curr_obj_depth == root_path_depth + 1, f"Video directories should be inside the root dir. {o} is not."
                 if curr_d in self._video_dir2frames:
-                    sorted_files = sorted(self._video_dir2frames[curr_d])
+                    sorted_files = sorted(self._video_dir2frames[curr_d], key=lambda x: int(x.split("/")[-1].split("frame")[1].split(".")[0]))  # Sort by frame number, not by string
                     self._video_dir2frames[curr_d] = sorted_files
                 curr_d = o
+
+        if curr_d in self._video_dir2frames:  # Sort the last video
+            sorted_files = sorted(self._video_dir2frames[curr_d], key=lambda x: int(x.split("/")[-1].split("frame")[1].split(".")[0]))  # Sort by frame number, not by string
+            self._video_dir2frames[curr_d] = sorted_files
 
         if self.discard_short_videos:
             self._video_dir2frames = {d: fs for d, fs in self._video_dir2frames.items() if len(fs) >= self.load_n_consecutive * self.subsample_factor}
@@ -399,7 +405,9 @@ class VideoFramesFolderDataset(Dataset):
             num_frames_available = len(self._video_idx2frames[self._raw_idx[idx]])
             assert num_frames_available - self.load_n_consecutive * self.subsample_factor >= 0, f"We have only {num_frames_available} frames available, cannot load {self.load_n_consecutive} frames."
 
-            if self.load_n_consecutive_random_offset:
+            if self.load_n_consecutive_offset:
+                random_offset = self.load_n_consecutive_offset
+            elif self.load_n_consecutive_random_offset:
                 random_offset = random.randint(0, num_frames_available - self.load_n_consecutive * self.subsample_factor + self.subsample_factor - 1)
             else:
                 random_offset = 0

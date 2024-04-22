@@ -15,7 +15,7 @@ NUM_FRAMES_IN_BATCH = {128: 128, 256: 128, 512: 64, 1024: 32}
 
 #----------------------------------------------------------------------------
 
-def compute_fvd(opts, max_real: int, num_gen: int, num_frames: int, subsample_factor: int=1):
+def compute_fvd(opts, max_real: int, num_gen: int, num_frames: int, subsample_factor: int=1, load_n_consecutive_offset: int=0):
     # Perfectly reproduced torchscript version of the I3D model, trained on Kinetics-400, used here:
     # https://github.com/google-research/google-research/blob/master/frechet_video_distance/frechet_video_distance.py
     # Note that the weights on tf.hub (used in the script above) differ from the original released weights
@@ -24,6 +24,7 @@ def compute_fvd(opts, max_real: int, num_gen: int, num_frames: int, subsample_fa
 
     opts = copy.deepcopy(opts)
     opts.dataset_kwargs.load_n_consecutive = num_frames
+    opts.dataset_kwargs.load_n_consecutive_offset = load_n_consecutive_offset
     opts.dataset_kwargs.subsample_factor = subsample_factor
     opts.dataset_kwargs.discard_short_videos = True
     batch_size = NUM_FRAMES_IN_BATCH[opts.dataset_kwargs.resolution] // num_frames
