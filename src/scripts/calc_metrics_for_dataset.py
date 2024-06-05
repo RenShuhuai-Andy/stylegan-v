@@ -64,6 +64,7 @@ def subprocess_fn(rank, args, temp_dir):
             progress=progress,
             cache=args.use_cache,
             num_runs=args.num_runs,
+            repeat_to_max_items=args.repeat_to_max_items,
         )
 
         if rank == 0:
@@ -89,7 +90,7 @@ class CommaSeparatedList(click.ParamType):
 
 #----------------------------------------------------------------------------
 
-def calc_metrics_for_dataset(ctx, metrics, real_data_path, fake_data_path, mirror, resolution, gpus, verbose, use_cache: bool, num_runs: int):
+def calc_metrics_for_dataset(ctx, metrics, real_data_path, fake_data_path, mirror, resolution, gpus, verbose, use_cache: bool, num_runs: int, repeat_to_max_items: bool):
     dnnlib.util.Logger(should_flush=True)
 
     # Validate arguments.
@@ -134,6 +135,7 @@ def calc_metrics_for_dataset(ctx, metrics, real_data_path, fake_data_path, mirro
     args.run_dir = None
     args.use_cache = use_cache
     args.num_runs = num_runs
+    args.repeat_to_max_items = repeat_to_max_items
 
     # Launch processes.
     if args.verbose:
@@ -158,6 +160,7 @@ def calc_metrics_for_dataset(ctx, metrics, real_data_path, fake_data_path, mirro
 @click.option('--verbose', help='Print optional information', type=bool, default=False, metavar='BOOL', show_default=True)
 @click.option('--use_cache', help='Use stats cache', type=bool, default=True, metavar='BOOL', show_default=True)
 @click.option('--num_runs', help='Number of runs', type=int, default=1, metavar='INT', show_default=True)
+@click.option('--repeat_to_max_items', help='Repeat the dataset until max_items is reached', type=bool, default=False, metavar='BOOL', show_default=True)
 def calc_metrics_cli_wrapper(ctx, *args, **kwargs):
     calc_metrics_for_dataset(ctx, *args, **kwargs)
 

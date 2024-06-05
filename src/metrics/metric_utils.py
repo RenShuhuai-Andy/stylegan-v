@@ -22,7 +22,7 @@ from src.training.dataset import video_to_image_dataset_kwargs
 
 class MetricOptions:
     def __init__(self, G=None, G_kwargs={}, dataset_kwargs={}, num_gpus=1, rank=0, device=None,
-                       progress=None, cache=True, gen_dataset_kwargs={}, generator_as_dataset=False):
+                       progress=None, cache=True, gen_dataset_kwargs={}, generator_as_dataset=False, repeat_to_max_items=False):
         assert 0 <= rank < num_gpus
         self.G                        = G
         self.G_kwargs                 = dnnlib.EasyDict(G_kwargs)
@@ -34,6 +34,7 @@ class MetricOptions:
         self.cache                    = cache
         self.gen_dataset_kwargs       = gen_dataset_kwargs
         self.generator_as_dataset     = generator_as_dataset
+        self.repeat_to_max_items      = repeat_to_max_items
 
 #----------------------------------------------------------------------------
 
@@ -245,6 +246,29 @@ def compute_feature_stats_for_dataset(
         features = detector(images.to(opts.device), **detector_kwargs)
         stats.append_torch(features, num_gpus=opts.num_gpus, rank=opts.rank)
         progress.update(stats.num_items)
+
+    if max_items is not None and opts.repeat_to_max_items:  # Repeat the dataset until max_items is reached
+        stats.max_items = max_items
+        progress.num_items = max_items
+        for batch in torch.utils.data.DataLoader(dataset=dataset, sampler=item_subset, batch_size=batch_size, **data_loader_kwargs):
+            if stats.num_items >= max_items:
+                break
+            images = batch['image']
+            if temporal_detector:
+                images = images.permute(0, 2, 1, 3, 4).contiguous()  # [batch_size, c, t, h, w]
+
+                # images = images.float() / 255
+                # images = torch.nn.functional.interpolate(images, size=(images.shape[2], 128, 128), mode='trilinear', align_corners=False) # downsample
+                # images = torch.nn.functional.interpolate(images, size=(images.shape[2], 256, 256), mode='trilinear', align_corners=False) # upsample
+                # images = (images * 255).to(torch.uint8)
+            else:
+                images = images.view(-1, *images.shape[-3:])  # [-1, c, h, w]
+
+            if images.shape[1] == 1:
+                images = images.repeat([1, 3, *([1] * (images.ndim - 2))])
+            features = detector(images.to(opts.device), **detector_kwargs)
+            stats.append_torch(features, num_gpus=opts.num_gpus, rank=opts.rank)
+            progress.update(stats.num_items)
 
     # Save to cache.
     if cache_file is not None and opts.rank == 0:
